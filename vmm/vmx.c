@@ -384,7 +384,9 @@ vmcs_ctls_init( struct Env* e ) {
 		      entry_ctls_or & entry_ctls_and );
     
 	uint64_t ept_ptr = e->env_cr3 | ( ( EPT_LEVELS - 1 ) << 3 );
-	vmcs_write64( VMCS_64BIT_CONTROL_EPTPTR, ept_ptr );
+	vmcs_write64( VMCS_64BIT_CONTROL_EPTPTR, ept_ptr 
+            | VMX_EPT_DEFAULT_MT
+            | (VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT) );
 
 	vmcs_write32( VMCS_32BIT_CONTROL_EXCEPTION_BITMAP, 
 		      e->env_vmxinfo.exception_bmap);
