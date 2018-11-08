@@ -121,7 +121,6 @@ handle_wrmsr(struct Trapframe *tf, struct VmxGuestInfo *ginfo) {
 		if(BIT(cur_val, EFER_LME) == 0 && BIT(new_val, EFER_LME) == 1) {
 			// Long mode enable.
 			uint32_t entry_ctls = vmcs_read32( VMCS_32BIT_CONTROL_VMENTRY_CONTROLS );
-			entry_ctls |= VMCS_VMENTRY_x64_GUEST;
 			vmcs_write32( VMCS_32BIT_CONTROL_VMENTRY_CONTROLS, 
 				      entry_ctls );
 

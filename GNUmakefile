@@ -296,6 +296,19 @@ tarball: handin-check
 # For test runs
 prep-net_%: override INIT_CFLAGS+=-DTEST_NO_NS
 
+# For test ept
+ept-prep:
+KERN_CFLAGS += -DTEST_EPT_MAP
+
+build-ept-test: ept-prep
+	$(V)$(MAKE) $(IMAGES)
+
+ept-test-nox: build-ept-test pre-qemu
+	$(QEMU) -nographic $(QEMUOPTS)
+
+ept-test-nox-gdb: build-ept-test pre-qemu
+	$(QEMU) -nographic $(QEMUOPTS) -S
+
 prep-%:
 	$(V)$(MAKE) "INIT_CFLAGS=${INIT_CFLAGS} -DTEST=`case $* in *_*) echo $*;; *) echo user_$*;; esac`" $(IMAGES)
 

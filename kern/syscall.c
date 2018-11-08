@@ -628,7 +628,7 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 	}
 }
 
-
+#ifndef VMM_GUEST
 #ifdef TEST_EPT_MAP
 int
 _export_sys_ept_map(envid_t srcenvid, void *srcva,
@@ -636,4 +636,5 @@ _export_sys_ept_map(envid_t srcenvid, void *srcva,
 {
 	return sys_ept_map(srcenvid, srcva, guest, guest_pa, perm);
 }
+#endif
 #endif

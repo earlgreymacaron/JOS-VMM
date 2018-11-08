@@ -148,9 +148,10 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-
+#ifndef VMM_GUEST
 #if defined(TEST_EPT_MAP)
 	test_ept_map();
+#endif
 #endif
 
 
