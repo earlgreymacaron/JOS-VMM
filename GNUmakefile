@@ -297,11 +297,8 @@ tarball: handin-check
 prep-net_%: override INIT_CFLAGS+=-DTEST_NO_NS
 
 # For test ept
-ept-prep:
-KERN_CFLAGS += -DTEST_EPT_MAP
-
-build-ept-test: ept-prep
-	$(V)$(MAKE) $(IMAGES)
+build-ept-test: 
+	$(V)$(MAKE) "KERN_CFLAGS=${KERN_CFLAGS} -DTEST_EPT_MAP" $(IMAGES)
 
 ept-test-nox: build-ept-test pre-qemu
 	$(QEMU) -nographic $(QEMUOPTS)

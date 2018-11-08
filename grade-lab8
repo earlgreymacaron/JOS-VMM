@@ -11,7 +11,7 @@ def test_ept():
 @test(5, parent=test_ept)
 def test_result():
     matches = re.findall("^kernel panic on CPU [0-9] at vmm/ept.c:[0-9]+: (.*)", r.qemu.output,re.MULTILINE)
-    assert_equal(matches[0], "Cheers! sys_ept_map seems to work correctly.")
+    assert_equal("\n".join(matches), "Cheers! sys_ept_map seems to work correctly.")
 
 
 def matchtest(parent, name, points, *args, **kw):
