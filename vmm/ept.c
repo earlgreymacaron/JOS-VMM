@@ -49,8 +49,86 @@ static inline int epte_present(epte_t epte)
 static int ept_lookup_gpa(epte_t* eptrt, void *gpa, 
 			  int create, epte_t **epte_out) {
     /* Your code here */
+    epte_t *epte, *epml4e, *epdpe, *epde;
+    struct PageInfo *new_page;
 
-    panic("ept_lookup_gpa not implemented\n");
+    // If eptrt is NULL, return -E_INVAL
+    if (!eptrt)
+        return -E_INVAL;
+
+    /* STEP 1 */
+    // Move to correct eplm4 entry
+    epml4e = &eptrt[ADDR_TO_IDX(gpa, 3)];
+
+    if(!(*epml4e) && !create)
+        return -E_NO_ENT;
+
+    // Create new epdp page if it doesn't exist
+    if(!(*epml4e) && create) {
+        new_page = page_alloc(ALLOC_ZERO);
+        if(!new_page)
+            return -E_NO_MEM;
+
+        new_page->pp_ref += 1;
+        *epml4e = (page2pa(new_page) | __EPTE_FULL);
+    }
+
+    // Extract epdp address from the eplm4 entry
+    epdpe = (epte_t *) epte_page_vaddr(*epml4e);
+
+    //cprintf("ept_lookup_gpa() STEP 1\n");
+
+    /* STEP 2 */
+    // Move to correct epdpe entry
+    epdpe = &epdpe[ADDR_TO_IDX(gpa, 2)];
+
+    if(!(*epdpe) && !create)
+        return -E_NO_ENT;
+
+    // Create new epd page if it doesn't exist
+    if(!(*epdpe) && create) {
+        new_page = page_alloc(ALLOC_ZERO);
+        if(!new_page)
+            return -E_NO_MEM;
+
+        new_page->pp_ref += 1;
+        *epdpe = (page2pa(new_page) | __EPTE_FULL);
+    }
+
+    // Extract epd address from the epdp entry
+    epde = (epte_t *) epte_page_vaddr(*epdpe);
+    //cprintf("ept_lookup_gpa() STEP 2\n");
+
+
+    /* STEP 3 */
+    // Move to correct epd entry
+    epde = &epde[ADDR_TO_IDX(gpa, 1)];
+
+    if(!(*epde) && !create)
+        return -E_NO_ENT;
+
+    // Create new epdp page if it doesn't exist
+    if(!(*epde) && create) {
+        new_page = page_alloc(ALLOC_ZERO);
+        if(!new_page)
+            return -E_NO_MEM;
+
+        new_page->pp_ref += 1;
+        *epde = (page2pa(new_page) | __EPTE_FULL);
+    }
+
+    // Extract ept address from the epd entry
+    epte = (epte_t *) epte_page_vaddr(*epde);
+    //cprintf("ept_lookup_gpa() STEP 3\n");
+
+    
+    /* STEP 4 */
+    // Move to correct ept entry
+    //epte = &epte[ADDR_TO_IDX(gpa, 0)];
+
+    // Store resulting epte in epte_out
+    *epte_out = epte;
+    //cprintf("ept_lookup_gpa() STEP 4\n");
 
     return 0;
 
@@ -134,9 +212,21 @@ int ept_map_hva2gpa(epte_t* eptrt, void* hva, void* gpa, int perm,
         int overwrite) {
 
     /* Your code here */
+    epte_t *epte;
+    int res;
 
-    panic("ept_map_hva2gpa not implemented\n");
+    // Find the corresponding epte for gpa
+    if((res = ept_lookup_gpa(eptrt, gpa, 1, &epte)) < 0)
+        return res;
 
+    epte = &epte[ADDR_TO_IDX(gpa, 0)];
+
+    // If there is already a mapping but overwrite is 0
+    if(*epte && !overwrite)
+        return -E_INVAL;
+
+    // Insert HPA into ept entry
+    *epte = PADDR(hva) | perm | __EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
 
     return 0;
 }

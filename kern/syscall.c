@@ -525,9 +525,46 @@ static int
 sys_ept_map(envid_t srcenvid, void *srcva,
 	    envid_t guest, void* guest_pa, int perm)
 {
-
 		/* Your code here */
-		panic ("sys_ept_map not implemented");
+    struct Env *srcenv, *guestenv;
+    struct PageInfo *pp;
+    int res;
+    pte_t *pte;
+    void *hva;
+
+    // Find corresponding Env structs
+    if (envid2env(srcenvid, &srcenv, 1) < 0
+            || envid2env(guest, &guestenv, 1) < 0)
+        return -E_BAD_ENV;
+
+    // Check if addresses are valid
+    if (srcva >= (void*) UTOP || srcva != ROUNDDOWN(srcva, PGSIZE) ||
+            guest_pa != ROUNDDOWN(guest_pa, PGSIZE) ||
+        guest_pa >= (void *) guestenv->env_vmxinfo.phys_sz)
+        return -E_INVAL;
+
+    // Check if guest has correct env type
+    if (guestenv->env_type != ENV_TYPE_GUEST)
+        return -E_BAD_ENV;
+
+    if (!perm)
+        return -E_INVAL;
+
+    // Check if srcva is mapped in srcenv's address space
+    pp = page_lookup(srcenv->env_pml4e,srcva, &pte);
+    if(!pp)
+        return -E_INVAL;
+
+    // Check if write permission is consistent
+    if((perm & __EPTE_WRITE) && !(*pte & __EPTE_WRITE))
+        return -E_INVAL;
+
+    // Map srcva -> guest_pa
+    if((res = ept_map_hva2gpa(guestenv->env_pml4e, page2kva(pp), guest_pa, perm,0)) < 0)
+        return res;
+
+    // Increment page reference count
+    pp->pp_ref += 1;
 
 		return 0;
 }
