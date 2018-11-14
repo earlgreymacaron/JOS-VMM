@@ -310,12 +310,12 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
     io_seg.length_high = ((uint64_t) (EXTPHYSMEM - IOPHYSMEM) >> 32) & FOURBYTEWORD;
     io_seg.type = MB_TYPE_RESERVED;
 
-    // 3. high memeory (phys_sz-0xFA000 ~ phys_sz)
+    // 3. high memeory (0x100000 ~ phys_sz)
     high_seg.size = 20;
-    high_seg.base_addr_low = (gInfo->phys_sz - 0xFA000) & FOURBYTEWORD;
-    high_seg.base_addr_high = (((uint64_t) gInfo->phys_sz - 0xFA000) >> 32) & FOURBYTEWORD;
-    high_seg.length_low = 0xFA000;
-    high_seg.length_high = 0;
+    high_seg.base_addr_low = 0x100000 & FOURBYTEWORD;
+    high_seg.base_addr_high = 0;
+    high_seg.length_low = ((uint64_t) gInfo->phys_sz - 0x100000) & FOURBYTEWORD;
+    high_seg.length_high = (((uint64_t) gInfo->phys_sz - 0x100000) >> 32) & FOURBYTEWORD;
     high_seg.type = MB_TYPE_USABLE;
 
     // Find hva of guest's pa 0x6000
