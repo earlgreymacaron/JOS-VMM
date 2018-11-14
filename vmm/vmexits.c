@@ -206,7 +206,7 @@ handle_ioinstr(struct Trapframe *tf, struct VmxGuestInfo *ginfo) {
 		return true;
 	} else {
 		cprintf("%x %x\n", qualification, port_iortc);
-		return false;    
+		return false;
 	}
 }
 
@@ -223,12 +223,30 @@ handle_ioinstr(struct Trapframe *tf, struct VmxGuestInfo *ginfo) {
 bool
 handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 {
-	/* Your code here */
+    /* Your code here */
+    uint64_t req;
+    uint32_t rax, rbx, rcx, rdx;
 
-	cprintf("Handle cpuid not implemented\n");
-	return false;
+    // Get guest's request argument from rax
+    req = tf->tf_regs.reg_rax;
 
+    // Issue the cpuid instruction
+    cpuid(req, &rax, &rbx, &rcx, &rdx);
 
+    // Hide the presence of vmx
+    if(req == 1)
+        rcx &= ~(1 << 5);
+
+    // Store output of cpuid()
+    tf->tf_regs.reg_rax = rax;
+    tf->tf_regs.reg_rbx = rbx;
+    tf->tf_regs.reg_rcx = rcx;
+    tf->tf_regs.reg_rdx = rdx;
+
+    // Advance the program counter
+    tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
+
+    return true;
 }
 
 

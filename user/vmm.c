@@ -142,12 +142,12 @@ umain(int argc, char **argv) {
 	snprintf(filename_buffer, 50, "/vmm/fs%d.img", vmdisk_number);
 
 	cprintf("Creating a new virtual HDD at /vmm/fs%d.img\n", vmdisk_number);
-	//r = copy("vmm/clean-fs.img", filename_buffer);
+	r = copy("vmm/clean-fs.img", filename_buffer);
 
-	//if (r < 0) {
-	//	cprintf("Create new virtual HDD failed: %e\n", r);
-	//	exit();
-	//}
+	if (r < 0) {
+		cprintf("Create new virtual HDD failed: %e\n", r);
+		exit();
+	}
 
 	cprintf("Create VHD finished\n");
 #endif
