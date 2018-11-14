@@ -121,10 +121,10 @@ static int ept_lookup_gpa(epte_t* eptrt, void *gpa,
     epte = (epte_t *) epte_page_vaddr(*epde);
     //cprintf("ept_lookup_gpa() STEP 3\n");
 
-    
+
     /* STEP 4 */
     // Move to correct ept entry
-    //epte = &epte[ADDR_TO_IDX(gpa, 0)];
+    epte = &epte[ADDR_TO_IDX(gpa, 0)];
 
     // Store resulting epte in epte_out
     *epte_out = epte;
@@ -219,7 +219,7 @@ int ept_map_hva2gpa(epte_t* eptrt, void* hva, void* gpa, int perm,
     if((res = ept_lookup_gpa(eptrt, gpa, 1, &epte)) < 0)
         return res;
 
-    epte = &epte[ADDR_TO_IDX(gpa, 0)];
+    //epte = &epte[ADDR_TO_IDX(gpa, 0)];
 
     // If there is already a mapping but overwrite is 0
     if(*epte && !overwrite)

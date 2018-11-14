@@ -16,6 +16,7 @@
 #include <kern/env.h>
 #include <kern/cpu.h>
 
+#define FOURBYTEWORD 0xFFFFFFFF
 
 static int vmdisk_number = 0;	//this number assign to the vm
 int 
@@ -232,7 +233,7 @@ handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 
 
 // Handle vmcall traps from the guest.
-// We currently support 3 traps: read the virtual e820 map, 
+// We currently support 3 traps: read the virtual e820 map,
 //   and use host-level IPC (send andrecv).
 //
 // Return true if the exit is handled properly, false if the VM should be terminated.
@@ -247,9 +248,12 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 	bool handled = false;
 	multiboot_info_t mbinfo;
 	int perm, r;
-	void *gpa_pg, *hva_pg;
+	void *gpa_pg, *hva_pg, *hva;
 	envid_t to_env;
-	uint32_t val;
+	uint32_t val, bytes;
+  struct PageInfo *new_page;
+  memory_map_t low_seg, io_seg, high_seg;
+
 	// phys address of the multiboot map in the guest.
 	uint64_t multiboot_map_addr = 0x6000;
 	switch(tf->tf_regs.reg_rax) {
@@ -265,9 +269,66 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 		//   a pointer to this region in rbx (as a guest physical address).
 		/* Your code here */
 
-		cprintf("e820 map hypercall not implemented\n");	    
-		handled = false;
+    // Set up multiboot_info_t
+    memset(&mbinfo, 0, sizeof(multiboot_info_t));
+    mbinfo.flags = MB_FLAG_MMAP;
+    // Only these fields are present because flag is set at bit 6
+    mbinfo.mmap_length = 3*sizeof(memory_map_t);
+    mbinfo.mmap_addr = multiboot_map_addr + sizeof(multiboot_info_t);
 
+    // 1. 640k of low mem (0 ~ IOPHYSMEM)
+    low_seg.size = 20;
+    low_seg.base_addr_low = 0;
+    low_seg.base_addr_high = 0;
+    low_seg.length_low = IOPHYSMEM & FOURBYTEWORD;
+    low_seg.length_high = ((uint64_t) IOPHYSMEM >> 32) & FOURBYTEWORD;
+    low_seg.type = MB_TYPE_USABLE;
+
+    // 2. I/O hole (IOPHYSMEM ~ EXTPHYSMEM)
+    io_seg.size = 20;
+    io_seg.base_addr_low = IOPHYSMEM & FOURBYTEWORD;
+    io_seg.base_addr_high = ((uint64_t) IOPHYSMEM >> 32) & FOURBYTEWORD;
+    io_seg.length_low = (EXTPHYSMEM - IOPHYSMEM) & FOURBYTEWORD;
+    io_seg.length_high = ((uint64_t) (EXTPHYSMEM - IOPHYSMEM) >> 32) & FOURBYTEWORD;
+    io_seg.type = MB_TYPE_RESERVED;
+
+    // 3. high memeory (phys_sz-0xFA000 ~ phys_sz)
+    high_seg.size = 20;
+    high_seg.base_addr_low = (gInfo->phys_sz - 0xFA000) & FOURBYTEWORD;
+    high_seg.base_addr_high = (((uint64_t) gInfo->phys_sz - 0xFA000) >> 32) & FOURBYTEWORD;
+    high_seg.length_low = 0xFA000;
+    high_seg.length_high = 0;
+    high_seg.type = MB_TYPE_USABLE;
+
+    // Find hva of guest's pa 0x6000
+    ept_gpa2hva(eptrt, (void *) multiboot_map_addr, &hva);
+    // If there is no mapping, allocate a new page
+    if(!hva) {
+        new_page = page_alloc(1);
+        if(!new_page)
+            return false;
+        new_page->pp_ref += 1;
+        hva = page2kva(new_page);
+    }
+
+    bytes = 0;
+
+    // Copy mbinfo and memory_map_t into the guest page
+    memmove(hva, &mbinfo, sizeof(multiboot_info_t));
+    bytes += sizeof(multiboot_info_t);
+    memmove(hva + bytes, &low_seg, sizeof(memory_map_t));
+    bytes += sizeof(memory_map_t);
+    memmove(hva + bytes, &io_seg, sizeof(memory_map_t));
+    bytes += sizeof(memory_map_t);
+    memmove(hva + bytes, &high_seg, sizeof(memory_map_t));
+
+    // Map it at guest's 0x6000
+    ept_map_hva2gpa(eptrt, hva, (void *) multiboot_map_addr, __EPTE_FULL, 1);
+
+    // Return a pointer to this region in rbx
+    tf->tf_regs.reg_rbx = multiboot_map_addr;
+
+		handled = true;
 		break;
 	case VMX_VMCALL_IPCSEND:
 		// Issue the sys_ipc_send call to the host.
@@ -316,7 +377,7 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 		 * Hint: The TA solution does not hard-code the length of the vmcall instruction.
 		 */
 		/* Your code here */
-
+    tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 	}
 	return handled;
 }
