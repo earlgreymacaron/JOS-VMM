@@ -76,7 +76,6 @@ static int ept_lookup_gpa(epte_t* eptrt, void *gpa,
     // Extract epdp address from the eplm4 entry
     epdpe = (epte_t *) epte_page_vaddr(*epml4e);
 
-    //cprintf("ept_lookup_gpa() STEP 1\n");
 
     /* STEP 2 */
     // Move to correct epdpe entry
@@ -97,7 +96,6 @@ static int ept_lookup_gpa(epte_t* eptrt, void *gpa,
 
     // Extract epd address from the epdp entry
     epde = (epte_t *) epte_page_vaddr(*epdpe);
-    //cprintf("ept_lookup_gpa() STEP 2\n");
 
 
     /* STEP 3 */
@@ -119,7 +117,6 @@ static int ept_lookup_gpa(epte_t* eptrt, void *gpa,
 
     // Extract ept address from the epd entry
     epte = (epte_t *) epte_page_vaddr(*epde);
-    //cprintf("ept_lookup_gpa() STEP 3\n");
 
 
     /* STEP 4 */
@@ -128,7 +125,6 @@ static int ept_lookup_gpa(epte_t* eptrt, void *gpa,
 
     // Store resulting epte in epte_out
     *epte_out = epte;
-    //cprintf("ept_lookup_gpa() STEP 4\n");
 
     return 0;
 
@@ -188,10 +184,25 @@ void free_guest_mem(epte_t* eptrt) {
 // Return 0 on success, <0 on failure.
 //
 int ept_page_insert(epte_t* eptrt, struct PageInfo* pp, void* gpa, int perm) {
-
     /* Your code here */
+    epte_t* epte;
+    void *hva;
+    int r;
 
-    panic("ept_page_insert not implemented\n");
+    // Get corresponding epte
+    if((r = ept_lookup_gpa(eptrt, gpa, 0, &epte)) < 0)
+        return r;
+
+    // If there is already a mapping, remove mapping
+    if(epte_present(*epte))
+        //page_remove(eptrt, pp);
+        page_decref(pa2page(epte_addr(*epte)));
+
+    // Insert HPA into ept entry
+    *epte = page2pa(pp) | perm | __EPTE_IPAT;
+
+    // On success, increment reference count
+    pp->pp_ref += 1;
 
     return 0;
 }
@@ -218,8 +229,6 @@ int ept_map_hva2gpa(epte_t* eptrt, void* hva, void* gpa, int perm,
     // Find the corresponding epte for gpa
     if((res = ept_lookup_gpa(eptrt, gpa, 1, &epte)) < 0)
         return res;
-
-    //epte = &epte[ADDR_TO_IDX(gpa, 0)];
 
     // If there is already a mapping but overwrite is 0
     if(*epte && !overwrite)

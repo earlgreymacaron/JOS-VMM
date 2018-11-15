@@ -55,11 +55,9 @@ bc_pgfault(struct UTrapframe *utf)
 
 
 
-
-
 #ifndef VMM_GUEST
 
-
+  // HOST 
 	if ((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
 		panic("in bc_pgfault, ide_read: %e", r);
 
@@ -69,7 +67,7 @@ bc_pgfault(struct UTrapframe *utf)
 
 	/* FIXME DP: Should be lab 8 */
 	if ((r = host_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
-		panic("in bc_pgfault, host_read: %e", r);
+		panic("in bc_pgfault, host_read: %e %x", r, addr);
 
 #endif // VMM_GUEST
 
@@ -87,7 +85,7 @@ bc_pgfault(struct UTrapframe *utf)
 
 // Flush the contents of the block containing VA out to disk if
 // necessary, then clear the PTE_D bit using sys_page_map.
-// If the block is not in the block cache or is not dirty, does
+// If the block is not in the block cache or if not dirty, does
 // nothing.
 // Hint: Use va_is_mapped, va_is_dirty, and ide_write.
 // Hint: Use the PTE_SYSCALL constant when calling sys_page_map.

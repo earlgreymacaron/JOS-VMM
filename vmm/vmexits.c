@@ -265,9 +265,10 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 {
 	bool handled = false;
 	multiboot_info_t mbinfo;
-	int perm, r;
-	void *gpa_pg, *hva_pg, *hva;
-	envid_t to_env;
+	int perm, r, i;
+	void *gpa_pg, *hva_pg, *hva, *dstva, *srcva;
+	envid_t to_envid;
+  struct Env *to_env;
 	uint32_t val, bytes;
   struct PageInfo *new_page;
   memory_map_t low_seg, io_seg, high_seg;
@@ -347,10 +348,11 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
     tf->tf_regs.reg_rbx = multiboot_map_addr;
 
 		handled = true;
+
 		break;
 	case VMX_VMCALL_IPCSEND:
 		// Issue the sys_ipc_send call to the host.
-		// 
+		//
 		// If the requested environment is the HOST FS, this call should
 		//  do this translation.
 		//
@@ -358,8 +360,25 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 		//  this to a host virtual address for the IPC to work properly.
 		/* Your code here */
 
-		cprintf("IPC send hypercall not implemented\n");	    
-		handled = false;
+    // If the requested env is HOST FS (envid = 1), do the translation
+    to_envid = tf->tf_regs.reg_rbx;
+    if(to_envid == 1 && curenv->env_type == ENV_TYPE_GUEST) {
+        for (i = 0; i < NENV; i++) {
+            if (envs[i].env_type == ENV_TYPE_FS) {
+                to_envid = envs[i].env_id;
+                break;
+            }
+        }
+    }
+
+    val = tf->tf_regs.reg_rcx;
+    ept_gpa2hva(eptrt, (void *) tf->tf_regs.reg_rdx, &srcva);
+    perm = tf->tf_regs.reg_rsi;
+
+    // Issue sys_ipc_send call to the host
+    tf->tf_regs.reg_rax = syscall(SYS_ipc_try_send, to_envid, val, (uint64_t) srcva, perm, 0);
+
+		handled = true;
 
 		break;
 
@@ -369,8 +388,14 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 		// you should go ahead and increment rip before this call.
 		/* Your code here */
 
-		cprintf("IPC recv hypercall not implemented\n");	    
-		handled = false;
+    // Increment rip before call
+    tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
+
+    // Issue sys_ipc_recv call for the guest
+    //ept_gpa2hva(eptrt, (void *) tf->tf_regs.reg_rbx, &dstva);
+    tf->tf_regs.reg_rax = syscall(SYS_ipc_recv, (uint64_t) tf->tf_regs.reg_rbx, 0, 0, 0, 0);
+
+		handled = true;
 
 		break;
 	case VMX_VMCALL_LAPICEOI:
