@@ -195,7 +195,6 @@ int ept_page_insert(epte_t* eptrt, struct PageInfo* pp, void* gpa, int perm) {
 
     // If there is already a mapping, remove mapping
     if(epte_present(*epte))
-        //page_remove(eptrt, pp);
         page_decref(pa2page(epte_addr(*epte)));
 
     // Insert HPA into ept entry

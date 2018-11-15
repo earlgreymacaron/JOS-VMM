@@ -22,16 +22,14 @@ map_in_guest(envid_t guest, uintptr_t gpa, size_t memsz,
     int i, r, perm;
     envid_t this_e;
 
-    cprintf("[+] map_in_guest 0x%x+0x%x\n", gpa, memsz);
-
     this_e = sys_getenvid();
 
-	if ((i = PGOFF(gpa))) {
-		gpa -= i;
-		memsz += i;
-		filesz += i;
-		fileoffset -= i;
-	}
+    if ((i = PGOFF(gpa))) {
+        gpa -= i;
+        memsz += i;
+        filesz += i;
+        fileoffset -= i;
+    }
 
     perm = PTE_P|PTE_U|PTE_W;
     for (i = 0; i < memsz; i += PGSIZE) {
@@ -47,7 +45,6 @@ map_in_guest(envid_t guest, uintptr_t gpa, size_t memsz,
         if ((r = sys_ept_map(this_e, UTEMP, guest,
                         (void *) gpa + i, __EPTE_FULL)) < 0)
             return r;
-        //cprintf("[+] mapped to 0x%x\n", gpa + i);
         sys_page_unmap(this_e, UTEMP);
     }
 
@@ -64,7 +61,6 @@ static int
 copy_guest_kern_gpa(envid_t guest, char* fname ) {
 	/* Your code here */
 	unsigned char elf_buf[512];
-
 	int fd, i, r;
 	struct Elf *elf;
 	struct Proghdr *ph;
@@ -80,20 +76,17 @@ copy_guest_kern_gpa(envid_t guest, char* fname ) {
             || elf->e_magic != ELF_MAGIC) {
 		close(fd);
     panic("copy_guest_kern_gpa(): not a valid ELF format binary");
-		//cprintf("elf magic %08x want %08x\n", elf->e_magic, ELF_MAGIC);
-		//return -E_NOT_EXEC;
 	}
 
 	// Set up program segments as defined in ELF header.
 	ph = (struct Proghdr*) (elf_buf + elf->e_phoff);
-  cprintf("[+] ph starts at ELF offset 0x%x\n", elf->e_phoff);
 	for (i = 0; i < elf->e_phnum; i++, ph++) {
-		if (ph->p_type == ELF_PROG_LOAD) {
-        assert(ph->p_filesz <= ph->p_memsz);
-		    if ((r = map_in_guest(guest, ph->p_pa, ph->p_memsz,
-				     fd, ph->p_filesz, ph->p_offset)) < 0) {
-            close(fd);
-            return r;
+      if (ph->p_type == ELF_PROG_LOAD) {
+          assert(ph->p_filesz <= ph->p_memsz);
+          if ((r = map_in_guest(guest, ph->p_pa, ph->p_memsz,
+                          fd, ph->p_filesz, ph->p_offset)) < 0) {
+              close(fd);
+              return r;
         }
     }
 	}

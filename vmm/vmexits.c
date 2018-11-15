@@ -266,7 +266,7 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 	bool handled = false;
 	multiboot_info_t mbinfo;
 	int perm, r, i;
-	void *gpa_pg, *hva_pg, *hva, *dstva, *srcva;
+	void *gpa_pg, *hva_pg, *hva, *gpa, *srcva;
 	envid_t to_envid;
   struct Env *to_env;
 	uint32_t val, bytes;
@@ -392,8 +392,8 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
     tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 
     // Issue sys_ipc_recv call for the guest
-    //ept_gpa2hva(eptrt, (void *) tf->tf_regs.reg_rbx, &dstva);
-    tf->tf_regs.reg_rax = syscall(SYS_ipc_recv, (uint64_t) tf->tf_regs.reg_rbx, 0, 0, 0, 0);
+    gpa = (void *) tf->tf_regs.reg_rbx;
+    tf->tf_regs.reg_rax = syscall(SYS_ipc_recv, (uint64_t) gpa, 0, 0, 0, 0);
 
 		handled = true;
 
